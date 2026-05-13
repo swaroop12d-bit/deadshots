@@ -248,6 +248,7 @@ function clearMap() {
     objects.forEach(o => scene.remove(o)); objects.length = 0;
     enemies.forEach(e => scene.remove(e)); enemies.length = 0;
     lootDrops.forEach(l => scene.remove(l)); lootDrops.length = 0;
+    scene.background = new THREE.Color(0x000000); scene.fog = null;
 }
 
 function createLoneWolfMap() {
@@ -276,6 +277,11 @@ function createBRMap() {
     const selectedMap = document.getElementById('map-select') ? document.getElementById('map-select').value : 'BERMUDA';
     const isKalahari = selectedMap === 'KALAHARI';
     
+    // Add Atmosphere and Sky
+    const skyColor = isKalahari ? 0xe69966 : 0x87CEEB;
+    scene.background = new THREE.Color(skyColor);
+    scene.fog = new THREE.Fog(skyColor, 200, 800);
+
     // 500% scale map
     const floorColor = isKalahari ? 0xd2b48c : 0x55aa55; // Sand vs Grass
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(1500, 1500, 50, 50), new THREE.MeshStandardMaterial({ color: floorColor, roughness: 1 }));
