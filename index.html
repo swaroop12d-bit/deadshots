@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, orientation=landscape">
+    <title>DEAD SHOTS - AAA UPDATE</title>
+    <link rel="stylesheet" href="style.css?v=6">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="game-container"></div>
+
+    <div id="ui-layer">
+        
+        <!-- LOBBY MENU -->
+        <div id="lobby">
+            <!-- Economy Top Bar -->
+            <div class="economy-bar">
+                <div class="currency"><span class="icon">🟡</span><span id="ui-coins">0</span></div>
+                <div class="currency"><span class="icon">💵</span><span id="ui-money">0</span></div>
+                <div class="currency"><span class="icon">💎</span><span id="ui-diamonds">0</span></div>
+            </div>
+
+            <h1 class="logo">DEAD SHOTS</h1>
+            
+            <button id="btn-open-shop" class="shop-btn">🛒 ITEM SHOP</button>
+
+            <div class="modes-container">
+                <div class="mode-card" id="btn-lone-wolf">
+                    <h2>LONE WOLF</h2>
+                    <p>1v1 Duel Arena</p>
+                    <p class="reward-hint">Reward: 1000 💎</p>
+                </div>
+                <div class="mode-card" id="btn-cs-ranked">
+                    <h2>CS RANKED</h2>
+                    <p>4v4 Warehouse</p>
+                    <p class="reward-hint">Reward: 2000 💎</p>
+                </div>
+                <div class="mode-card" id="btn-br-ranked">
+                    <h2>BR RANKED</h2>
+                    <p>Open World Survival</p>
+                    <p class="reward-hint">Reward: 3000 💎</p>
+                </div>
+                <div class="mode-card" id="btn-multiplayer" style="border-color: #a450ff;">
+                    <h2>MULTIPLAYER</h2>
+                    <p>Online Free Roam</p>
+                    <p class="reward-hint" style="color: #a450ff !important;">Play with Friends</p>
+                </div>
+            </div>
+        </div>
+
+        <canvas id="minimap" width="150" height="150"></canvas>
+
+        <div id="rotate-warning">Please rotate your phone sideways!</div>
+
+        <!-- Mobile Controls -->
+        <div id="mobile-controls" style="display: none;">
+            <button id="btn-reload" class="mobile-btn">🔄</button>
+            <button id="btn-gloo" class="mobile-btn">🛡️</button>
+            <button id="btn-grenade" class="mobile-btn">💣</button>
+            <button id="btn-inhaler" class="mobile-btn">💊</button>
+        </div>
+
+        <!-- SHOP MODAL -->
+        <div id="shop-modal" style="display: none;">
+            <div class="shop-content">
+                <h2>BLACK MARKET</h2>
+                <button id="btn-close-shop" class="close-btn">X</button>
+                <div class="shop-items">
+                    <div class="shop-item">
+                        <h3>Gold AR Skin</h3>
+                        <p>Cost: 1000 🟡</p>
+                        <button class="buy-btn" data-type="skin" data-item="gold_ar" data-cost="1000" data-curr="coins">BUY</button>
+                    </div>
+                    <div class="shop-item">
+                        <h3>Neon Gloo Wall</h3>
+                        <p>Cost: 500 💵</p>
+                        <button class="buy-btn" data-type="skin" data-item="neon_gloo" data-cost="500" data-curr="money">BUY</button>
+                    </div>
+                    <div class="shop-item">
+                        <h3>Ruby Sniper</h3>
+                        <p>Cost: 2000 💎</p>
+                        <button class="buy-btn" data-type="skin" data-item="ruby_sniper" data-cost="2000" data-curr="diamonds">BUY</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PAUSE / BLOCKER -->
+        <div id="blocker" style="display:none;">
+            <div id="instructions">
+                <h1>PAUSED</h1>
+                <p>Click to play</p>
+                <p>Move: WASD | Jump: SPACE | Shoot: Mouse Left | Reload: R | Gloo Wall: E | Grenade: G | Inhaler: Q | Weapons: 1, 2, 3, 4</p>
+            </div>
+        </div>
+
+        <!-- GAME HUD -->
+        <div id="hud" style="display: none;">
+            <div id="scoreboard" class="scoreboard">
+                <div class="score-team" id="score-blue" style="color: #00aaff;">BLUE: 0</div>
+                <div class="timer" id="match-timer">03:00</div>
+                <div class="score-team" id="score-red" style="color: #ff3333;">RED: 0</div>
+            </div>
+
+            <div class="crosshair"></div>
+            <div class="kill-feed" id="kill-feed"></div>
+
+            <div class="inventory-container">
+                <div class="weapon-slot active" id="slot-1">1: AR</div>
+                <div class="weapon-slot" id="slot-2">2: SHOTGUN</div>
+                <div class="weapon-slot" id="slot-3">3: SNIPER</div>
+                <div class="weapon-slot" id="slot-4">4: SMG</div>
+                <div class="gloo-slot" id="gloo-count">Gloo Walls: 3 [E]</div>
+                <div class="inhaler-slot" id="inhaler-count">Inhalers: 3 [Q]</div>
+                <div class="grenade-slot" id="grenade-count">Grenades: 2 [G]</div>
+            </div>
+
+            <div class="health-container">
+                <div class="health-label">HP</div>
+                <div class="health-bar-bg">
+                    <div id="health-bar" class="health-bar-fill"></div>
+                </div>
+                <div id="health-text" class="health-text">100</div>
+            </div>
+
+            <div class="ammo-container">
+                <div id="ammo-text" class="ammo-text">30 / 120</div>
+                <div id="ammo-label" class="ammo-label">5.56mm NATO</div>
+            </div>
+            
+            <div id="hit-marker" class="hit-marker"></div>
+            <div id="damage-overlay" class="damage-overlay"></div>
+        </div>
+
+        <!-- END SCREEN -->
+        <div id="end-screen" style="display: none;">
+            <h1 id="end-title">BOOYAH!</h1>
+            <p id="end-rewards" class="end-rewards">+1000 Coins, Money, Diamonds!</p>
+            <button id="btn-home">RETURN TO LOBBY</button>
+        </div>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script type="module" src="main.js?v=6"></script>
+</body>
+</html>

@@ -1,0 +1,121 @@
+body {
+    margin: 0; overflow: hidden; background-color: #000;
+    font-family: 'Inter', sans-serif; color: #fff; user-select: none; touch-action: none;
+}
+#game-container, #ui-layer { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; }
+#game-container { z-index: 1; }
+#ui-layer { z-index: 10; pointer-events: none; }
+
+/* LOBBY */
+#lobby {
+    position: absolute; width: 100%; height: 100%;
+    background: url('https://images.unsplash.com/photo-1542751371-adc38448a05e?ixlib=rb-1.2.1&auto=format&fit=crop&w=2850&q=80') center/cover no-repeat;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    pointer-events: auto; z-index: 20;
+}
+#lobby::before { content: ''; position: absolute; width: 100%; height: 100%; background: rgba(10, 10, 15, 0.85); backdrop-filter: blur(15px); z-index: -1; }
+.economy-bar {
+    position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 30px; background: rgba(0,0,0,0.8); padding: 10px 30px;
+    border-radius: 20px; border: 2px solid rgba(255,215,0,0.5);
+}
+.currency { font-size: 1.5rem; font-weight: bold; font-family: 'Share Tech Mono', monospace; }
+.currency .icon { margin-right: 10px; }
+
+.logo {
+    font-family: 'Share Tech Mono', monospace; font-size: 8rem; margin: 0 0 20px 0;
+    background: linear-gradient(90deg, #ff416c, #ff4b2b); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    letter-spacing: 10px; z-index: 1; filter: drop-shadow(0 0 20px rgba(255, 65, 108, 0.6));
+}
+.shop-btn {
+    background: #ff3333; border: none; color: white; padding: 15px 40px; font-size: 1.5rem;
+    font-weight: bold; border-radius: 8px; cursor: pointer; margin-bottom: 50px;
+    box-shadow: 0 0 20px rgba(255,51,51,0.5); transition: 0.2s;
+}
+.shop-btn:hover { transform: scale(1.1); }
+
+.modes-container { display: flex; gap: 30px; z-index: 1; }
+.mode-card {
+    background: linear-gradient(135deg, #1e1e24, #2a2a35); border: 2px solid rgba(255,255,255,0.1);
+    padding: 40px 30px; border-radius: 15px; text-align: center; cursor: pointer;
+    transition: all 0.3s; width: 250px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+.mode-card:hover { transform: translateY(-10px); background: linear-gradient(135deg, #ff416c, #ff4b2b); border-color: rgba(255,255,255,0.4); box-shadow: 0 15px 40px rgba(255, 65, 108, 0.5); }
+.mode-card h2 { color: #fff; font-size: 2rem; margin-bottom: 10px; font-family: 'Share Tech Mono', monospace; }
+.mode-card p { color: #aaa; font-size: 1rem; }
+.reward-hint { margin-top: 15px; color: #ffd700 !important; font-weight: bold; }
+
+/* SHOP MODAL */
+#shop-modal {
+    position: absolute; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center;
+    pointer-events: auto; z-index: 30;
+}
+.shop-content {
+    background: #111; border: 2px solid #ffd700; padding: 40px; border-radius: 15px;
+    width: 600px; position: relative;
+}
+.shop-content h2 { color: #ffd700; font-size: 2.5rem; text-align: center; margin-bottom: 30px; }
+#btn-jump { right: 150px; bottom: 50px; }
+#btn-reload { right: 50px; bottom: 50px; }
+#btn-gloo { right: 150px; bottom: 150px; }
+#btn-grenade { right: 150px; bottom: 250px; }
+#btn-inhaler { right: 230px; bottom: 50px; }
+
+.mobile-btn { position: absolute; width: 70px; height: 70px; border-radius: 50%; background: rgba(255,255,255,0.4); border: 2px solid white; font-size: 28px; pointer-events: auto; user-select: none; z-index: 999; }
+.mobile-btn:active { background: rgba(255,255,255,0.8); transform: scale(0.9); }
+
+#btn-shoot { right: 50px; bottom: 150px; width: 90px; height: 90px; font-size: 35px; }
+
+#minimap { position: absolute; top: 20px; left: 20px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.5); background: rgba(0,0,0,0.4); z-index: 10; display: none; }
+#rotate-warning { display: none; position: absolute; top:0; left:0; width:100%; height:100%; background:black; color:white; z-index:9999; justify-content:center; align-items:center; font-size: 2rem; text-align: center; font-weight: bold; }
+@media screen and (orientation: portrait) {
+    #rotate-warning { display: flex !important; }
+}
+.close-btn { position: absolute; top: 15px; right: 15px; background: red; color: white; border: none; font-size: 1.5rem; cursor: pointer; border-radius: 5px; }
+.shop-items { display: flex; justify-content: space-between; }
+.shop-item { background: #222; padding: 20px; border-radius: 10px; text-align: center; width: 30%; }
+.buy-btn { margin-top: 10px; background: #00aaff; color: white; border: none; padding: 10px 20px; cursor: pointer; font-weight: bold; border-radius: 5px; }
+.buy-btn:disabled { background: #555; cursor: not-allowed; }
+
+/* HUD & PAUSE */
+#blocker { position: absolute; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; justify-content: center; align-items: center; pointer-events: auto; backdrop-filter: blur(8px); }
+#instructions h1 { font-family: 'Share Tech Mono', monospace; font-size: 6rem; color: #ffd700; }
+#hud { position: absolute; width: 100%; height: 100%; }
+.scoreboard { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 40px; background: rgba(0,0,0,0.7); padding: 10px 30px; border-radius: 10px; border: 2px solid rgba(255,255,255,0.1); }
+.score-team { font-family: 'Share Tech Mono', monospace; font-size: 2rem; font-weight: bold; }
+.timer { font-family: 'Share Tech Mono', monospace; font-size: 2.5rem; color: #fff; }
+
+.crosshair { position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background-color: #fff; transform: translate(-50%, -50%); border-radius: 50%; }
+.kill-feed { position: absolute; top: 20px; right: 20px; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+.kill-msg { background: rgba(0,0,0,0.6); padding: 6px 12px; border-radius: 4px; font-size: 0.9rem; border-right: 3px solid #ff3333; animation: fadeOut 5s forwards; }
+@keyframes fadeOut { 0% { opacity: 1; transform: translateX(20px); } 80% { opacity: 1; } 100% { opacity: 0; display: none; } }
+
+.inventory-container { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; }
+.weapon-slot { background: rgba(0,0,0,0.5); padding: 10px 20px; border: 2px solid rgba(255,255,255,0.2); border-radius: 6px; color: #888; font-weight: bold; transition: all 0.2s; }
+.weapon-slot.active { background: rgba(255, 215, 0, 0.2); border-color: #ffd700; color: #ffd700; transform: scale(1.1); }
+.gloo-slot { background: rgba(0, 150, 255, 0.2); padding: 10px 20px; border: 2px solid #0096ff; border-radius: 6px; color: #0096ff; font-weight: bold; margin-left: 20px; }
+.inhaler-slot { background: rgba(0, 255, 150, 0.2); padding: 10px 20px; border: 2px solid #00ff96; border-radius: 6px; color: #00ff96; font-weight: bold; margin-left: 10px; }
+.grenade-slot { background: rgba(255, 100, 0, 0.2); padding: 10px 20px; border: 2px solid #ff6400; border-radius: 6px; color: #ff6400; font-weight: bold; margin-left: 10px; }
+
+.health-container { position: absolute; bottom: 40px; left: 40px; display: flex; align-items: center; gap: 15px; background: rgba(0, 0, 0, 0.5); padding: 15px 25px; border-radius: 8px; border-left: 4px solid #ff3333; }
+.health-label { font-weight: 900; font-size: 1.2rem; }
+.health-bar-bg { width: 200px; height: 12px; background: rgba(255, 255, 255, 0.2); border-radius: 6px; overflow: hidden; }
+.health-bar-fill { width: 100%; height: 100%; background: linear-gradient(90deg, #ff3333, #ff6666); transition: width 0.2s; }
+.health-text { font-family: 'Share Tech Mono', monospace; font-size: 2rem; width: 50px; }
+
+.ammo-container { position: absolute; bottom: 40px; right: 40px; text-align: right; background: rgba(0, 0, 0, 0.5); padding: 15px 25px; border-radius: 8px; border-right: 4px solid #ffd700; }
+.ammo-text { font-family: 'Share Tech Mono', monospace; font-size: 3rem; line-height: 1; }
+.hit-marker { position: absolute; top: 50%; left: 50%; width: 20px; height: 20px; transform: translate(-50%, -50%) rotate(45deg); border: 2px solid transparent; opacity: 0; transition: opacity 0.1s; }
+.hit-marker.active { border-color: #ff3333; opacity: 1; }
+
+.damage-overlay { position: absolute; top:0; left:0; width:100%; height:100%; box-shadow: inset 0 0 100px rgba(255,0,0,0); pointer-events: none; transition: box-shadow 0.2s; }
+.damage-overlay.active { box-shadow: inset 0 0 150px rgba(255,0,0,0.8); }
+
+/* END SCREEN */
+#end-screen { position: absolute; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: auto; z-index: 30; }
+#end-title { font-family: 'Share Tech Mono', monospace; font-size: 8rem; color: #ffd700; text-shadow: 0 0 50px rgba(255, 215, 0, 0.8); margin-bottom: 20px; animation: popIn 0.5s ease-out; }
+@keyframes popIn { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+.end-rewards { font-size: 2rem; color: #00ff00; margin-bottom: 40px; font-weight: bold; }
+#btn-home { background: transparent; border: 2px solid #fff; color: #fff; padding: 15px 40px; font-size: 1.5rem; font-family: 'Share Tech Mono', monospace; cursor: pointer; transition: all 0.2s; }
+#btn-home:hover { background: #fff; color: #000; }
