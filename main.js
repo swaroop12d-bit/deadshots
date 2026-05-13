@@ -142,7 +142,7 @@ const mobileControls = document.getElementById('mobile-controls'); const joystic
 init(); animate();
 
 function init() {
-    scene = new THREE.Scene(); camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000); camera.position.y = 1.6;
+    scene = new THREE.Scene(); camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 500000); camera.position.y = 1.6;
     ambientLight = new THREE.AmbientLight(0xffffff, 0.5); scene.add(ambientLight);
     dirLight = new THREE.DirectionalLight(0xffffff, 1.5); dirLight.position.set(-50, 50, -50); dirLight.castShadow = !isMobile; scene.add(dirLight);
 
