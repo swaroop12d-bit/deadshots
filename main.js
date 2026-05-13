@@ -90,7 +90,22 @@ function playEndSound(won) {
     }
     osc.connect(gain); gain.connect(audioCtx.destination);
 }
-function playVoice(text) { window.speechSynthesis.cancel(); const utter = new SpeechSynthesisUtterance(text); utter.rate = 1.1; utter.pitch = 0.9; window.speechSynthesis.speak(utter); }
+function playVoice(text) {
+    if(!window.speechSynthesis) return; const u = new SpeechSynthesisUtterance(text);
+    u.rate = 1.2; u.pitch = 0.8; u.volume = 1.0; window.speechSynthesis.speak(u);
+}
+
+function playKillSound() {
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(110, audioCtx.currentTime); // Low A
+    osc.frequency.exponentialRampToValueAtTime(55, audioCtx.currentTime + 0.5);
+    gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.5);
+    playVoice("Enemy eliminated!");
+}
 
 // System
 let camera, scene, renderer, controls, raycaster;
@@ -106,6 +121,7 @@ const weapons = [
 ];
 let currentWeaponIdx = 0, ammo = weapons[0].maxAmmo, lastFireTime = 0, glooWalls = 3, inhalers = 3, grenades = 2;
 let gunGroup, barrel, muzzleFlash; let dirLight, ambientLight, timeOfDay = 0;
+let ziplines = []; let airdropTimer = 30; let usingZipline = false; let zipProgress = 0; let currentZip = null;
 
 // UI
 const lobbyUI = document.getElementById('lobby'); const shopModal = document.getElementById('shop-modal'); const blocker = document.getElementById('blocker');
@@ -257,15 +273,41 @@ function createCSMap() {
 }
 
 function createBRMap() {
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(300, 300, 50, 50), new THREE.MeshStandardMaterial({ map: grassTex, roughness: 1 }));
+    const selectedMap = document.getElementById('map-select') ? document.getElementById('map-select').value : 'BERMUDA';
+    const isKalahari = selectedMap === 'KALAHARI';
+    
+    // 500% scale map
+    const floorColor = isKalahari ? 0xd2b48c : 0x55aa55; // Sand vs Grass
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(1500, 1500, 50, 50), new THREE.MeshStandardMaterial({ color: floorColor, roughness: 1 }));
     floor.rotation.x = -Math.PI/2; floor.receiveShadow = true; scene.add(floor); objects.push(floor);
-    const houseMat = new THREE.MeshStandardMaterial({ map: brickTex }); const roofMat = new THREE.MeshStandardMaterial({ color: 0xaa3333 });
-    for(let i=0; i<15; i++) {
-        const hx = Math.random()*200-100, hz = Math.random()*200-100;
-        if(Math.abs(hx)<20 && Math.abs(hz)<20) continue;
-        const house = new THREE.Mesh(new THREE.BoxGeometry(10, 6, 10), houseMat); house.position.set(hx, 3, hz); scene.add(house); objects.push(house);
-        const roof = new THREE.Mesh(new THREE.ConeGeometry(8, 4, 4), roofMat); roof.position.set(hx, 8, hz); roof.rotation.y = Math.PI/4; scene.add(roof); objects.push(roof);
-        if(Math.random() > 0.5) dropLoot(new THREE.Vector3(hx+6, 0, hz));
+    
+    const houseMat = new THREE.MeshStandardMaterial({ color: isKalahari ? 0xe6ccb2 : 0x888888 }); 
+    const roofMat = new THREE.MeshStandardMaterial({ color: isKalahari ? 0x9c6644 : 0xaa3333 });
+    
+    // Spawn houses
+    for(let i=0; i<60; i++) {
+        const hx = Math.random()*1000-500, hz = Math.random()*1000-500;
+        if(Math.abs(hx)<50 && Math.abs(hz)<50) continue;
+        const house = new THREE.Mesh(new THREE.BoxGeometry(20, 12, 20), houseMat); house.position.set(hx, 6, hz); scene.add(house); objects.push(house);
+        const roof = new THREE.Mesh(new THREE.ConeGeometry(16, 8, 4), roofMat); roof.position.set(hx, 16, hz); roof.rotation.y = Math.PI/4; scene.add(roof); objects.push(roof);
+        if(Math.random() > 0.5) dropLoot(new THREE.Vector3(hx+12, 0, hz));
+    }
+
+    // Spawn ziplines
+    for(let i=0; i<5; i++) {
+        const start = new THREE.Vector3(Math.random()*800-400, 30, Math.random()*800-400);
+        const end = new THREE.Vector3(Math.random()*800-400, 5, Math.random()*800-400);
+        const dist = start.distanceTo(end);
+        const lineGeom = new THREE.CylinderGeometry(0.5, 0.5, dist);
+        const lineMesh = new THREE.Mesh(lineGeom, new THREE.MeshBasicMaterial({color: 0x000000}));
+        lineMesh.position.copy(start).lerp(end, 0.5);
+        lineMesh.lookAt(end); lineMesh.rotation.x = Math.PI/2;
+        scene.add(lineMesh);
+        
+        const pole1 = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 30), new THREE.MeshStandardMaterial({color: 0x333333})); pole1.position.copy(start); pole1.position.y = 15; scene.add(pole1);
+        const pole2 = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 5), new THREE.MeshStandardMaterial({color: 0x333333})); pole2.position.copy(end); pole2.position.y = 2.5; scene.add(pole2);
+        
+        ziplines.push({start: start, end: end});
     }
 }
 
@@ -330,30 +372,74 @@ function endGame(titleText, won) {
 
 function createEnemies(count) {
     for (let i = 0; i < count; i++) {
-        let enemyMesh;
-        if(adamModel) {
-            enemyMesh = SkeletonUtils.clone(adamModel);
-            enemyMesh.traverse(child => { if(child.isMesh && child.material.name === "vanguard_Mesh") { child.material = child.material.clone(); if(Math.random() > 0.5) child.material.color.setHex(Math.random() * 0xffffff); } });
-        } else {
-            enemyMesh = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), new THREE.MeshBasicMaterial({ color: 0x555555, transparent: true, opacity: 0.5 }));
-        }
+        let enemyMesh = new THREE.Group();
         
-        enemyMesh.position.set(Math.random()*40-20, 0, Math.random()*40-20);
-        enemyMesh.userData = { hp: 100, isEnemy: true, lastFire: 0, name: botNames[Math.floor(Math.random() * botNames.length)], velocity: new THREE.Vector3(Math.random()-0.5, 0, Math.random()-0.5).normalize().multiplyScalar(4) };
-        scene.add(enemyMesh); objects.push(enemyMesh); enemies.push(enemyMesh);
+        // Blocky Roblox style body parts
+        const skinColors = [0xffcc99, 0xd2a679, 0x8d5524, 0xe0ac69];
+        const shirtColors = [0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff];
+        const skinCol = skinColors[Math.floor(Math.random() * skinColors.length)];
+        const shirtCol = shirtColors[Math.floor(Math.random() * shirtColors.length)];
+        
+        const head = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.8), new THREE.MeshStandardMaterial({color: skinCol}));
+        head.position.y = 1.6;
+        
+        // Number on back using Canvas
+        const canvas = document.createElement('canvas'); canvas.width = 64; canvas.height = 64;
+        const ctx = canvas.getContext('2d'); ctx.fillStyle = '#' + shirtCol.toString(16).padStart(6, '0'); ctx.fillRect(0,0,64,64);
+        ctx.fillStyle = 'white'; ctx.font = 'bold 40px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(Math.floor(Math.random()*99).toString(), 32, 32);
+        const tex = new THREE.CanvasTexture(canvas);
+        const torsoMats = [
+            new THREE.MeshStandardMaterial({color: shirtCol}), // right
+            new THREE.MeshStandardMaterial({color: shirtCol}), // left
+            new THREE.MeshStandardMaterial({color: shirtCol}), // top
+            new THREE.MeshStandardMaterial({color: shirtCol}), // bottom
+            new THREE.MeshStandardMaterial({color: shirtCol}), // front
+            new THREE.MeshStandardMaterial({map: tex})         // back
+        ];
+        
+        const torso = new THREE.Mesh(new THREE.BoxGeometry(1, 1.2, 0.5), torsoMats);
+        torso.position.y = 0.6;
+        
+        const armGeo = new THREE.BoxGeometry(0.4, 1.2, 0.4); const legGeo = new THREE.BoxGeometry(0.45, 1.2, 0.45);
+        const lArm = new THREE.Mesh(armGeo, new THREE.MeshStandardMaterial({color: skinCol})); lArm.position.set(-0.7, 0.6, 0);
+        const rArm = new THREE.Mesh(armGeo, new THREE.MeshStandardMaterial({color: skinCol})); rArm.position.set(0.7, 0.6, 0);
+        const lLeg = new THREE.Mesh(legGeo, new THREE.MeshStandardMaterial({color: 0x222222})); lLeg.position.set(-0.25, -0.6, 0);
+        const rLeg = new THREE.Mesh(legGeo, new THREE.MeshStandardMaterial({color: 0x222222})); rLeg.position.set(0.25, -0.6, 0);
+        
+        enemyMesh.add(head); enemyMesh.add(torso); enemyMesh.add(lArm); enemyMesh.add(rArm); enemyMesh.add(lLeg); enemyMesh.add(rLeg);
+        
+        enemyMesh.position.set(Math.random()*200-100, 1.2, Math.random()*200-100);
+        
+        // Add animation state properties
+        enemyMesh.userData = { 
+            hp: 100, 
+            isEnemy: true, 
+            lastFire: 0, 
+            name: botNames[Math.floor(Math.random() * botNames.length)], 
+            velocity: new THREE.Vector3(Math.random()-0.5, 0, Math.random()-0.5).normalize().multiplyScalar(4),
+            animOffset: Math.random() * Math.PI * 2 // For bobbing animation
+        };
+        
+        // Create an invisible hit box around the group for raycasting
+        const hitbox = new THREE.Mesh(new THREE.BoxGeometry(1.5, 3, 1), new THREE.MeshBasicMaterial({visible: false}));
+        hitbox.userData = enemyMesh.userData; // Link userdata to hitbox
+        enemyMesh.add(hitbox);
+        
+        scene.add(enemyMesh); objects.push(hitbox); enemies.push(enemyMesh);
     }
 }
 
 function createObstacles() {
-    for (let i = 0; i < 40; i++) {
-        let x = Math.random() * 80 - 40;
-        let z = Math.random() * 80 - 40;
-        if (Math.abs(x) < 5 && Math.abs(z) < 5) continue; // Keep spawn clear
-        let crate = new THREE.Mesh(
-            new THREE.BoxGeometry(2, 2, 2),
-            new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.8, metalness: 0.2 })
-        );
-        crate.position.set(x, 1, z);
+    const selectedMap = document.getElementById('map-select') ? document.getElementById('map-select').value : 'BERMUDA';
+    const crateMat = selectedMap === 'KALAHARI' ? new THREE.MeshStandardMaterial({ color: 0xdd9955, roughness: 1.0 }) : new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.8, metalness: 0.2 });
+
+    for (let i = 0; i < 80; i++) {
+        let x = Math.random() * 400 - 200;
+        let z = Math.random() * 400 - 200;
+        if (Math.abs(x) < 20 && Math.abs(z) < 20) continue; // Keep spawn clear
+        let crate = new THREE.Mesh(new THREE.BoxGeometry(4, 4, 4), crateMat);
+        crate.position.set(x, 2, z);
         scene.add(crate);
         objects.push(crate);
     }
@@ -404,6 +490,7 @@ function createExplosion(pos) {
         if(enemy.position.distanceTo(pos) < 10) {
             enemy.userData.hp -= 200;
             if(enemy.userData.hp <= 0 && enemy.parent === scene) {
+                playKillSound();
                 scene.remove(enemy); objects.splice(objects.indexOf(enemy), 1); enemies.splice(enemies.indexOf(enemy), 1);
                 dropLoot(enemy.position); blueScore++;
                 if(currentMode === 'LONE_WOLF' && blueScore >= 3) handleWin(); else if(currentMode === 'CS_RANKED' && blueScore >= 4) handleWin();
@@ -434,6 +521,17 @@ function onKeyDown(event) {
         case 'Space': if (canJump) velocity.y += 10; canJump = false; break;
         case 'KeyR': ammo = weapons[currentWeaponIdx].maxAmmo; createWeapon(); playVoice("Reloading"); break;
         case 'KeyE': spawnGlooWall(); break; case 'KeyQ': useInhaler(); break; case 'KeyG': throwGrenade(); break;
+        case 'KeyF': 
+            if(!usingZipline) {
+                let pPos = controls.getObject().position;
+                for(let i=0; i<ziplines.length; i++) {
+                    if(pPos.distanceTo(ziplines[i].start) < 15) {
+                        usingZipline = true; currentZip = ziplines[i]; zipProgress = 0;
+                        playVoice("Zipline engaged!"); break;
+                    }
+                }
+            }
+            break;
         case 'Digit1': currentWeaponIdx=0; createWeapon(); break; case 'Digit2': currentWeaponIdx=1; createWeapon(); break; case 'Digit3': currentWeaponIdx=2; createWeapon(); break; case 'Digit4': currentWeaponIdx=3; createWeapon(); break;
     }
 }
@@ -453,6 +551,7 @@ function shoot() {
         if (obj.userData && obj.userData.isEnemy) {
             obj.userData.hp -= wp.damage; document.getElementById('hit-marker').classList.add('active'); setTimeout(() => document.getElementById('hit-marker').classList.remove('active'), 100);
             if (obj.userData.hp <= 0) {
+                playKillSound();
                 if(wp.name === 'SNIPER') playVoice("Headshot!");
                 scene.remove(obj); objects.splice(objects.indexOf(obj), 1); enemies.splice(enemies.indexOf(obj), 1);
                 dropLoot(obj.position); blueScore++;
@@ -510,23 +609,42 @@ function animate() {
 
         enemies.forEach(enemy => {
             const dist = enemy.position.distanceTo(playerPos);
-            if(dist < 30) {
-                // Look at player and walk towards them
+            
+            // Animation for Roblox characters
+            enemy.userData.animOffset += delta * 15;
+            let isMoving = true;
+
+            if(dist < 50) {
                 enemy.lookAt(playerPos);
-                if (dist > 5) {
+                if (dist > 10) {
                     const dir = new THREE.Vector3().subVectors(playerPos, enemy.position).normalize();
-                    enemy.position.addScaledVector(dir, delta * 3); // Move speed
+                    enemy.position.addScaledVector(dir, delta * 6); // Faster Move speed
+                } else {
+                    isMoving = false;
                 }
                 
                 if(time - enemy.userData.lastFire > 2000) { 
                     const dir = new THREE.Vector3().subVectors(playerPos, enemy.position).normalize(); raycaster.set(enemy.position, dir); const intersects = raycaster.intersectObjects(objects, true);
                     let hasLOS = true; if (intersects.length > 0 && intersects[0].distance < dist) hasLOS = false;
-                    if(hasLOS) { enemy.userData.lastFire = time; takeDamage(1); } // Reduced damage to 1
+                    if(hasLOS) { enemy.userData.lastFire = time; takeDamage(25); } // Increased damage to 25
                 }
             } else {
                 enemy.position.addScaledVector(enemy.userData.velocity, delta);
-                if (Math.abs(enemy.position.x) > 40) enemy.userData.velocity.x *= -1; if (Math.abs(enemy.position.z) > 40) enemy.userData.velocity.z *= -1;
+                if (Math.abs(enemy.position.x) > 400) enemy.userData.velocity.x *= -1; if (Math.abs(enemy.position.z) > 400) enemy.userData.velocity.z *= -1;
                 const target = enemy.position.clone().add(enemy.userData.velocity); enemy.lookAt(target);
+            }
+            
+            // Apply bobbing animation
+            if (isMoving) {
+                enemy.children.forEach(c => {
+                    if (c.geometry && c.geometry.type === 'BoxGeometry') {
+                        if (c.position.y < 0) { // Legs
+                            c.rotation.x = Math.sin(enemy.userData.animOffset) * 0.6;
+                        } else if (c.position.y > 0 && c.position.y < 1) { // Arms
+                            c.rotation.x = Math.sin(enemy.userData.animOffset + Math.PI) * 0.6;
+                        }
+                    }
+                });
             }
         });
 
@@ -540,7 +658,23 @@ function animate() {
             }
         }
 
-        if (controls.isLocked || isMobile) {
+        // Airdrop mechanic
+        if (currentMode === 'BR_RANKED') {
+            airdropTimer -= delta;
+            if (airdropTimer <= 0) {
+                airdropTimer = 30; // Reset timer to 30 seconds
+                dropLoot(new THREE.Vector3(Math.random()*1000-500, 0, Math.random()*1000-500));
+                playVoice("Airdrop incoming!");
+            }
+        }
+
+        if (usingZipline && currentZip) {
+            zipProgress += delta * 0.3; // Slide speed
+            if (zipProgress >= 1) { usingZipline = false; zipProgress = 1; }
+            const newPos = new THREE.Vector3().copy(currentZip.start).lerp(currentZip.end, zipProgress);
+            controls.getObject().position.copy(newPos);
+            velocity.set(0,0,0);
+        } else if (controls.isLocked || isMobile) {
             velocity.x -= velocity.x * 10.0 * delta; velocity.z -= velocity.z * 10.0 * delta; velocity.y -= 9.8 * 3.0 * delta;
             if (isMobile) { direction.z = joyY; direction.x = joyX; } else { direction.z = Number(moveForward) - Number(moveBackward); direction.x = Number(moveRight) - Number(moveLeft); } direction.normalize();
             if (isMobile) { velocity.z -= direction.z * 40.0 * delta * Math.abs(joyY); velocity.x -= direction.x * 40.0 * delta * Math.abs(joyX); } else { if (moveForward || moveBackward) velocity.z -= direction.z * 40.0 * delta; if (moveLeft || moveRight) velocity.x -= direction.x * 40.0 * delta; }
