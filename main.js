@@ -93,7 +93,7 @@ function playEndSound(won) {
 }
 function playVoice(text) {
     if(!window.speechSynthesis) return; const u = new SpeechSynthesisUtterance(text);
-    u.rate = 1.2; u.pitch = 0.8; u.volume = 1.0; window.speechSynthesis.speak(u);
+    u.rate = 1.0; u.pitch = 1.0; u.volume = 1.0; window.speechSynthesis.speak(u);
 }
 
 function playKillSound() {
@@ -433,7 +433,16 @@ function createEnemies(count) {
         
         enemyMesh.add(head); enemyMesh.add(torso); enemyMesh.add(lArm); enemyMesh.add(rArm); enemyMesh.add(lLeg); enemyMesh.add(rLeg);
         
-        enemyMesh.position.set(Math.random()*200-100, 1.2, Math.random()*200-100);
+        let ex, ez;
+        if(currentMode === 'BR_RANKED') {
+            do { ex = Math.random()*1400-700; ez = Math.random()*1400-700; } while (Math.abs(ex) < 100 && Math.abs(ez) < 100); // 100m safe zone
+        } else if (currentMode === 'CS_RANKED') {
+            do { ex = Math.random()*90-45; ez = Math.random()*90-45; } while (Math.abs(ex) < 20 && Math.abs(ez) < 20);
+        } else {
+            ex = Math.random()*36-18; ez = Math.random()*36-18;
+            if(Math.abs(ex)<5 && Math.abs(ez)<5) ex = 15;
+        }
+        enemyMesh.position.set(ex, 1.2, ez);
         
         // Add animation state properties
         enemyMesh.userData = { 
