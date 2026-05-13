@@ -43,7 +43,7 @@ async function networkLoop() {
     if (GAME_STATE !== 'PLAYING') return;
     try {
         const pos = controls.getObject().position;
-        const res = await fetch('/update', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ id: playerId, x: pos.x, y: pos.y, z: pos.z }) });
+        const res = await fetch('https://deadshots-4.onrender.com/update', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ id: playerId, x: pos.x, y: pos.y, z: pos.z }) });
         const data = await res.json();
         for (const id in data) {
             if (id === playerId) continue;
@@ -283,6 +283,9 @@ function startGame(mode) {
 
     clearMap(); clearInterval(timerInterval); playBGM();
 
+    // Spawn random crate obstacles for cover
+    createObstacles();
+
     if(mode === 'LONE_WOLF') { playVoice("Lone Wolf Mode."); createLoneWolfMap(); createEnemies(10); } 
     else if(mode === 'CS_RANKED') { playVoice("CS Ranked."); createCSMap(); createEnemies(20); } 
     else if(mode === 'BR_RANKED') {
@@ -341,9 +344,24 @@ function createEnemies(count) {
     }
 }
 
+function createObstacles() {
+    for (let i = 0; i < 40; i++) {
+        let x = Math.random() * 80 - 40;
+        let z = Math.random() * 80 - 40;
+        if (Math.abs(x) < 5 && Math.abs(z) < 5) continue; // Keep spawn clear
+        let crate = new THREE.Mesh(
+            new THREE.BoxGeometry(2, 2, 2),
+            new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.8, metalness: 0.2 })
+        );
+        crate.position.set(x, 1, z);
+        scene.add(crate);
+        objects.push(crate);
+    }
+}
+
 function createWeapon() {
     if(gunGroup) camera.remove(gunGroup); gunGroup = new THREE.Group(); const wp = weapons[currentWeaponIdx];
-    let color = wp.baseColor; if(wp.name === 'AR' && savedData.skins.gold_ar) color = 0xffd700; if(wp.name === 'SNIPER' && savedData.skins.ruby_sniper) color = 0xff0000;
+    let color = wp.baseColor; if(wp.name === 'AR' && savedData.skins.gold_ar) color = 0xffd700; if(wp.name === 'AR' && savedData.skins.red_katana) color = 0xff0000; if(wp.name === 'SNIPER' && savedData.skins.ruby_sniper) color = 0xff0000;
     const gunMesh = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.15, 0.6), new THREE.MeshStandardMaterial({ color: color, metalness: 0.8 })); gunMesh.position.set(0.3, -0.2, -0.5);
     const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, wp.name==='SNIPER'?0.8:0.4), new THREE.MeshStandardMaterial({ color: 0x111 })); barrel.rotation.x = Math.PI/2; barrel.position.set(0.3, -0.15, wp.name==='SNIPER'?-1.0:-0.9);
     muzzleFlash = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.4), new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.9, side: THREE.DoubleSide })); muzzleFlash.position.set(0.3, -0.15, wp.name==='SNIPER'?-1.45:-1.15); muzzleFlash.visible = false;
@@ -450,6 +468,15 @@ function animate() {
     requestAnimationFrame(animate);
     const time = performance.now(); const delta = (time - prevTime) / 1000; prevTime = time;
 
+    // Alok's Aura Passive Healing
+    if (GAME_STATE === 'PLAYING' && savedData.skins && savedData.skins.alok_aura) {
+        if (playerHealth < 100) {
+            playerHealth = Math.min(100, playerHealth + (1 * delta));
+            document.getElementById('health-text').innerText = Math.floor(playerHealth); 
+            document.getElementById('health-bar').style.width = playerHealth + '%';
+        }
+    }
+
     if (GAME_STATE === 'PLAYING') {
         timeOfDay += delta * 0.05; if (timeOfDay > Math.PI*2) timeOfDay = 0; dirLight.position.set(Math.cos(timeOfDay)*50, Math.sin(timeOfDay)*50, 0);
 
@@ -484,11 +511,17 @@ function animate() {
         enemies.forEach(enemy => {
             const dist = enemy.position.distanceTo(playerPos);
             if(dist < 30) {
+                // Look at player and walk towards them
                 enemy.lookAt(playerPos);
+                if (dist > 5) {
+                    const dir = new THREE.Vector3().subVectors(playerPos, enemy.position).normalize();
+                    enemy.position.addScaledVector(dir, delta * 3); // Move speed
+                }
+                
                 if(time - enemy.userData.lastFire > 2000) { 
                     const dir = new THREE.Vector3().subVectors(playerPos, enemy.position).normalize(); raycaster.set(enemy.position, dir); const intersects = raycaster.intersectObjects(objects, true);
                     let hasLOS = true; if (intersects.length > 0 && intersects[0].distance < dist) hasLOS = false;
-                    if(hasLOS) { enemy.userData.lastFire = time; takeDamage(2); }
+                    if(hasLOS) { enemy.userData.lastFire = time; takeDamage(1); } // Reduced damage to 1
                 }
             } else {
                 enemy.position.addScaledVector(enemy.userData.velocity, delta);
