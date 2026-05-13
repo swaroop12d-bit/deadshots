@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+import { Sky } from 'three/addons/objects/Sky.js';
 
 // --- ECONOMY & STORAGE ---
 let savedData = JSON.parse(localStorage.getItem('deadShotsData')) || {
@@ -122,6 +123,7 @@ const weapons = [
 let currentWeaponIdx = 0, ammo = weapons[0].maxAmmo, lastFireTime = 0, glooWalls = 3, inhalers = 3, grenades = 2;
 let gunGroup, barrel, muzzleFlash; let dirLight, ambientLight, timeOfDay = 0;
 let ziplines = []; let airdropTimer = 30; let usingZipline = false; let zipProgress = 0; let currentZip = null;
+let sky, sun;
 
 // UI
 const lobbyUI = document.getElementById('lobby'); const shopModal = document.getElementById('shop-modal'); const blocker = document.getElementById('blocker');
@@ -249,6 +251,7 @@ function clearMap() {
     enemies.forEach(e => scene.remove(e)); enemies.length = 0;
     lootDrops.forEach(l => scene.remove(l)); lootDrops.length = 0;
     scene.background = new THREE.Color(0x000000); scene.fog = null;
+    if (sky) { scene.remove(sky); sky = null; }
 }
 
 function createLoneWolfMap() {
@@ -277,10 +280,25 @@ function createBRMap() {
     const selectedMap = document.getElementById('map-select') ? document.getElementById('map-select').value : 'BERMUDA';
     const isKalahari = selectedMap === 'KALAHARI';
     
-    // Add Atmosphere and Sky
-    const skyColor = isKalahari ? 0xe69966 : 0x87CEEB;
-    scene.background = new THREE.Color(skyColor);
-    scene.fog = new THREE.Fog(skyColor, 200, 800);
+    // AAA Sky Graphics
+    sky = new Sky();
+    sky.scale.setScalar(450000);
+    scene.add(sky);
+    sun = new THREE.Vector3();
+    const uniforms = sky.material.uniforms;
+    uniforms['turbidity'].value = isKalahari ? 15 : 5; // Dusty vs Clear
+    uniforms['rayleigh'].value = isKalahari ? 4 : 1.5;
+    uniforms['mieCoefficient'].value = 0.005;
+    uniforms['mieDirectionalG'].value = 0.8;
+    
+    // Kalahari is Sunset (elevation 5), Bermuda is Mid-day (elevation 45)
+    const elevation = isKalahari ? 2 : 45; 
+    const phi = THREE.MathUtils.degToRad(90 - elevation);
+    const theta = THREE.MathUtils.degToRad(180);
+    sun.setFromSphericalCoords(1, phi, theta);
+    sky.material.uniforms['sunPosition'].value.copy(sun);
+
+    scene.fog = new THREE.Fog(isKalahari ? 0xe69966 : 0x87CEEB, 200, 800);
 
     // 500% scale map
     const floorColor = isKalahari ? 0xd2b48c : 0x55aa55; // Sand vs Grass
@@ -334,10 +352,10 @@ function startGame(mode) {
     // Spawn random crate obstacles for cover
     createObstacles();
 
-    if(mode === 'LONE_WOLF') { playVoice("Lone Wolf Mode."); createLoneWolfMap(); createEnemies(10); } 
-    else if(mode === 'CS_RANKED') { playVoice("CS Ranked."); createCSMap(); createEnemies(20); } 
+    if(mode === 'LONE_WOLF') { playVoice("Lone Wolf Mode."); createLoneWolfMap(); createEnemies(25); } 
+    else if(mode === 'CS_RANKED') { playVoice("CS Ranked."); createCSMap(); createEnemies(50); } 
     else if(mode === 'BR_RANKED') {
-        playVoice("Battle Royale Ranked."); createBRMap(); createEnemies(40); matchTimer = 180;
+        playVoice("Battle Royale Ranked."); createBRMap(); createEnemies(150); matchTimer = 180;
         timerInterval = setInterval(() => {
             matchTimer--; let m = Math.floor(matchTimer / 60), s = matchTimer % 60;
             document.getElementById('match-timer').innerText = `${m < 10 ? '0'+m : m}:${s < 10 ? '0'+s : s}`;
@@ -553,13 +571,20 @@ function shoot() {
 
     raycaster.setFromCamera(new THREE.Vector2(0, 0), camera); const intersects = raycaster.intersectObjects(objects, true);
     if (intersects.length > 0) {
-        let obj = intersects[0].object; while(obj.parent && obj.parent.type !== "Scene" && !obj.userData.isEnemy) obj = obj.parent;
+        let obj = intersects[0].object; 
+        if (obj.parent && obj.parent.userData && obj.parent.userData.isEnemy) obj = obj.parent;
+
         if (obj.userData && obj.userData.isEnemy) {
             obj.userData.hp -= wp.damage; document.getElementById('hit-marker').classList.add('active'); setTimeout(() => document.getElementById('hit-marker').classList.remove('active'), 100);
             if (obj.userData.hp <= 0) {
                 playKillSound();
                 if(wp.name === 'SNIPER') playVoice("Headshot!");
-                scene.remove(obj); objects.splice(objects.indexOf(obj), 1); enemies.splice(enemies.indexOf(obj), 1);
+                scene.remove(obj); 
+                
+                const hitbox = obj.children.find(c => c.geometry && c.geometry.type === 'BoxGeometry' && !c.material.visible);
+                if(hitbox) objects.splice(objects.indexOf(hitbox), 1);
+                
+                enemies.splice(enemies.indexOf(obj), 1);
                 dropLoot(obj.position); blueScore++;
                 if(currentMode === 'LONE_WOLF' && blueScore >= 3) handleWin(); else if(currentMode === 'CS_RANKED' && blueScore >= 4) handleWin();
             }
